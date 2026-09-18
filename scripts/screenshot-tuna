@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Capture Tuna's launcher window to a PNG without stealing its focus.
+#
+#   ./scripts/screenshot-tuna NAME [DELAY] [--shadow]
+#
+# Waits DELAY seconds (default 6) so you can summon Tuna and navigate, then captures the
+# on-screen Tuna window by ID into media/screenshots/NAME.png. Pass --shadow to keep the
+# window shadow; by default the PNG is the bare window on a transparent background.
+set -euo pipefail
+
+ROOT="/Users/kbs/projects/TunaExtensions"
+NAME="${1:?usage: screenshot-tuna NAME [DELAY] [--shadow]}"
+DELAY="${2:-6}"
+SHADOW="${3:-}"
+OUT_DIR="$ROOT/media/screenshots/fantastical"
+HELPER_DIR="$ROOT/build/tools"
+HELPER="$HELPER_DIR/tuna-window-id"
+
+mkdir -p "$OUT_DIR" "$HELPER_DIR"
+
+if [[ ! -x "$HELPER" || "$HELPER" -ot "${BASH_SOURCE[0]}" ]]; then
+  cat > "$HELPER_DIR/tuna-window-id.swift" <<'SWIFT'
+import CoreGraphics
+import Foundation
+
+let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+  exit(1)
+}
+// Prefer the launcher panel: an unnamed on-screen Tuna window, largest first.
+let ignoredNames: Set<String> = ["Sources", "Settings", "Shelf", "Colors", "Extension Store"]
+var best: (number: Int, area: CGFloat)?
+for window in windows {
+  guard window[kCGWindowOwnerName as String] as? String == "Tuna",
+    let bounds = window[kCGWindowBounds as String] as? [String: CGFloat],
+    let number = window[kCGWindowNumber as String] as? Int
+  else { continue }
+  let name = window[kCGWindowName as String] as? String ?? ""
+  if ignoredNames.contains(name) { continue }
+  let width = bounds["Width"] ?? 0
+  let height = bounds["Height"] ?? 0
+  guard width > 300, height > 100 else { continue }
+  let area = width * height
+  if best == nil || area > best!.area { best = (number, area) }
+}
+if let best {
+  print(best.number)
+  exit(0)
+}
+exit(2)
+SWIFT
+  swiftc -O "$HELPER_DIR/tuna-window-id.swift" -o "$HELPER" >/dev/null
+fi
+
+echo "Summon Tuna and set up the view; capturing in ${DELAY}s…"
+sleep "$DELAY"
+
+if ! WINDOW_ID="$("$HELPER")"; then
+  echo "No visible Tuna window found. Summon Tuna before the delay ends." >&2
+  exit 1
+fi
+
+ARGS=(-l "$WINDOW_ID" -x)
+[[ "$SHADOW" == "--shadow" ]] || ARGS+=(-o)
+screencapture "${ARGS[@]}" "$OUT_DIR/$NAME.png"
+echo "Saved $OUT_DIR/$NAME.png"
