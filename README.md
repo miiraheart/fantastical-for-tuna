@@ -8,6 +8,13 @@ launcher, then reschedule, rename, relocate or delete items without opening Fant
 Requires Tuna 0.96 or later (TunaKit 1.22.0) and macOS 15. The agenda needs Fantastical 4.1.17 or
 later (tested with 4.2, direct download build).
 
+| | |
+| --- | --- |
+| ![Agenda groups with counts](media/screenshots/01-agenda.png) | ![Views, New Event and New Task entries](media/screenshots/02-views.png) |
+| ![Add to Fantastical with fields](media/screenshots/03-add-with-fields.png) | ![Fantastical's preview of the parsed event](media/screenshots/04-event-preview.png) |
+| ![Add to Fantastical Calendar target picker](media/screenshots/05-add-to-calendar.png) | ![New Event browsed into event calendars](media/screenshots/06-new-event-calendars.png) |
+| ![New Task browsed into task lists](media/screenshots/07-new-task-lists.png) | |
+
 ## What it adds
 
 **Sources (Settings → Sources → Fantastical)**
@@ -65,6 +72,10 @@ and a misspelled key stops the action with "Unknown field" instead of silently l
 without spaces works, for example `>>` or `;;`. The separator only counts when it stands alone
 between spaces, so `https://x.com/a--b` is safe. macOS may turn `--` into an em dash while you type;
 both are accepted.
+
+Fantastical's own words (`/Calendar`, `at Place`, `alert 30 minutes`, `todo`) belong in the sentence,
+before the first separator; text after a field key is taken literally, so `notes: test /Perso` puts
+`/Perso` in the note. A partial calendar name is enough: `cal: Perso` picks "Personnel".
 
 Fields are translated into Fantastical's own grammar (`todo`, a quoted title, `from X to Y`,
 `all day`, `alert`, `/Calendar`) because Fantastical 4.2 applies only `sentence`, `notes`, `url`
