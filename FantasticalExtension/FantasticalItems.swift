@@ -82,8 +82,6 @@ final class FantasticalDestinationItem: CatalogItem, CopyRepresentationProviding
   }
 }
 
-/// "New Event" and "New Task" search entries; the typed text is the action's target. With a
-/// calendar the entry adds into that calendar instead of Fantastical's default.
 class FantasticalNewItemEntry: CatalogEntity, ActionFilteringProviding, @unchecked Sendable {
   let isTask: Bool
   let calendar: FantasticalCalendar?
@@ -122,20 +120,63 @@ class FantasticalNewItemEntry: CatalogEntity, ActionFilteringProviding, @uncheck
   }
 }
 
-/// The two searchable roots; browsing one lists the writable calendars of its kind.
 final class FantasticalNewItemRoot: FantasticalNewItemEntry, CatalogHierarchyNode, @unchecked Sendable {
+  private static let calendarLoad = DeferredCatalogLoadState()
+  /// Last load failure, cleared once shown, so a failing helper is not restarted on every
+  /// rebuild of this node.
+  private static let lastLoadError = LockedValue<Error?>(nil)
+
   func hierarchyChildren() -> [CatalogItem] {
     let matching = FantasticalAgendaSupport.knownCalendars.readValue { $0 }
       .filter { $0.isWritable && (isTask ? $0.supportsTasks : $0.supportsEvents) }
-    guard !matching.isEmpty else {
-      Task { _ = try? await FantasticalAgendaSupport.calendars() }
+    guard matching.isEmpty else {
+      return matching.map { FantasticalNewItemEntry(task: isTask, calendar: $0) }
+    }
+    let failure = Self.lastLoadError.withValue { pending -> Error? in
+      let error = pending
+      pending = nil
+      return error
+    }
+    if let failure {
+      return [FantasticalAgendaSupport.errorItem(failure)]
+    }
+    guard !Self.calendarLoad.didCompleteLoad else {
       return [
         FantasticalAgendaSupport.messageItem(
-          title: "Calendars Not Loaded Yet", message: "Try again in a moment.",
-          symbolName: "arrow.clockwise", tint: .secondaryLabelColor)
+          title: isTask ? "No Writable Task Lists" : "No Writable Calendars",
+          message: isTask
+            ? "Fantastical has no task list Tuna can add to."
+            : "Fantastical has no calendar Tuna can add to.",
+          symbolName: "calendar.badge.exclamationmark", tint: .secondaryLabelColor)
       ]
     }
-    return matching.map { FantasticalNewItemEntry(task: isTask, calendar: $0) }
+    Self.loadCalendars()
+    return [
+      CatalogLoadingItem(
+        title: "Loading Calendars", message: "Asking Fantastical for your calendars.")
+    ]
+  }
+
+  /// Reporting the scan once the helper answers rebuilds this node with the calendars in it,
+  /// instead of making the user leave the pane and come back.
+  static func loadCalendars() {
+    calendarLoad.requestLoadIfNeeded {
+      Task {
+        do {
+          _ = try await FantasticalAgendaSupport.calendars()
+          lastLoadError.value = nil
+          calendarLoad.markLoadCompleted()
+        } catch {
+          lastLoadError.value = error
+          calendarLoad.reset()
+        }
+        FantasticalAgendaSupport.postScanFinished(identifier: FantasticalIdentifiers.catalog)
+      }
+    }
+  }
+
+  static func invalidateCalendars() {
+    calendarLoad.reset()
   }
 }
 

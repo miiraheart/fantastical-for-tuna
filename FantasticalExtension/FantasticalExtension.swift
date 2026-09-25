@@ -3,7 +3,9 @@ import TunaKit
 
 @objc(FantasticalExtension)
 public final class FantasticalExtension: Extension {
-  public override var declaration: ExtensionDeclaration? {
+  public override var declaration: ExtensionDeclaration? { Self.makeDeclaration() }
+
+  static func makeDeclaration() -> ExtensionDeclaration {
     ExtensionDeclaration(
       metadata: ExtensionMetadata(
         displayName: "Fantastical",
@@ -68,13 +70,16 @@ public final class FantasticalExtension: Extension {
       typeRegistrations: [
         TypeRegistrationDefinition(
           typeID: TypeID.fantasticalDestination, displayName: "Fantastical Views",
-          inheritsFrom: [TypeID("com.tuna.type.entity")]),
+          inheritsFrom: [.entity]),
         TypeRegistrationDefinition(
           typeID: TypeID.fantasticalItem, displayName: "Fantastical Items",
-          inheritsFrom: [TypeID("com.tuna.type.entity")]),
+          inheritsFrom: [.entity]),
         TypeRegistrationDefinition(
           typeID: TypeID.fantasticalCalendar, displayName: "Fantastical Calendars",
-          inheritsFrom: [TypeID("com.tuna.type.entity")]),
+          inheritsFrom: [.entity]),
+        TypeRegistrationDefinition(
+          typeID: TypeID.fantasticalTaskGroup, displayName: "Fantastical Task Groups",
+          inheritsFrom: [.entity]),
       ],
       defaultActionRankings: [
         DefaultActionRankingDefinition(
@@ -92,7 +97,19 @@ public final class FantasticalExtension: Extension {
               catalogIdentifier: FantasticalIdentifiers.actionCatalog,
               actionID: FantasticalIdentifiers.showAction),
             ActionReference(
-              catalogIdentifier: FantasticalIdentifiers.actionCatalog, actionID: "reschedule"),
+              catalogIdentifier: FantasticalIdentifiers.actionCatalog,
+              actionID: FantasticalIdentifiers.completeAction),
+            ActionReference(
+              catalogIdentifier: FantasticalIdentifiers.actionCatalog,
+              actionID: FantasticalIdentifiers.rescheduleAction),
+          ]
+        ),
+        DefaultActionRankingDefinition(
+          typeID: TypeID.fantasticalTaskGroup,
+          actions: [
+            ActionReference(
+              catalogIdentifier: FantasticalIdentifiers.actionCatalog,
+              actionID: FantasticalIdentifiers.showAllTasksAction)
           ]
         ),
       ],
@@ -100,8 +117,10 @@ public final class FantasticalExtension: Extension {
         AppBrowseEnrichmentDefinition(
           bundleIdentifiers: [FantasticalIdentifiers.bundleIdentifier],
           entries: [
-            AppBrowseEnrichmentEntryDefinition(catalogIdentifier: FantasticalIdentifiers.agendaCatalog),
-            AppBrowseEnrichmentEntryDefinition(catalogIdentifier: FantasticalIdentifiers.catalog),
+            AppBrowseEnrichmentEntryDefinition(
+              catalogIdentifier: FantasticalIdentifiers.agendaCatalog, title: "Agenda"),
+            AppBrowseEnrichmentEntryDefinition(
+              catalogIdentifier: FantasticalIdentifiers.catalog, title: "Views"),
           ]
         )
       ],
@@ -123,4 +142,8 @@ enum FantasticalIdentifiers {
   static let actionCatalog = "fantastical.actions"
   static let showAction = "show-in-fantastical"
   static let addTypedAction = "add-typed"
+  static let miniWindowAction = "open-mini-window"
+  static let rescheduleAction = "reschedule"
+  static let completeAction = "complete-task"
+  static let showAllTasksAction = "show-all-tasks"
 }

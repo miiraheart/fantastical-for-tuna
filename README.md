@@ -37,6 +37,8 @@ later (tested with 4.2, direct download build).
 | Search Fantastical | text | Opens Fantastical's search with the text. |
 | Show Date in Fantastical | text that is one date (`2026-10-03`, `tomorrow`, `next friday`) | Reveals that day. |
 | Reschedule…, Rename…, Change Location… | an agenda item, target: typed text | `modifyCalendarItem` through Fantastical's helper. Reschedule takes words such as `tomorrow 15h` or `next monday 9h to 10h`. |
+| Show All Tasks | the Tasks group | Default action (Return) on Tasks: every open task in one list, due soonest first. → still opens the groups. |
+| Complete Task | a Reminders task | Marks it done through EventKit and keeps Tuna open. |
 | Delete from Fantastical | an agenda item | Tuna asks for confirmation, then `deleteCalendarItem` through the helper. |
 
 Anything Fantastical's parser understands works in the sentence: `at Quick Cuts` for a location,
@@ -98,14 +100,15 @@ and `add` from a parse URL while its preview is open; the other documented param
 ## Privacy
 
 Everything stays on this Mac. Creating items and opening views go through Fantastical's URL
-scheme; the agenda comes from Fantastical's own MCP helper
+scheme; events come from Fantastical's own MCP helper
 (`Fantastical.app/Contents/Helpers/FantasticalMCP.app`) over standard input and output, one
-request at a time. No network access from the extension, no credentials, no EventKit. Agenda
-results live in memory only while the browse or search is open. The helper does not expose notes,
-links, or a done flag, so those are not shown and tasks cannot be completed from Tuna.
+request at a time. Open tasks come from EventKit for Reminders lists (Tuna asks for the Reminders
+permission once) and from Fantastical's local database, opened read only, for the lists Fantastical
+syncs itself. No network access from the extension, no credentials. Agenda results live in memory
+only while the browse or search is open.
 
 Writes performed: create (URL scheme, with Fantastical's preview unless *Add without
-confirmation* is on), reschedule, rename, change location (`modifyCalendarItem`), and delete
+confirmation* is on), complete (EventKit, Reminders tasks), reschedule, rename, change location (`modifyCalendarItem`), and delete
 (`deleteCalendarItem`, only after Tuna's confirmation).
 
 ## Development

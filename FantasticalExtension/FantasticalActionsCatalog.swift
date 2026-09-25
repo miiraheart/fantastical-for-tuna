@@ -21,6 +21,8 @@ extension FantasticalActionsCatalog {
     FantasticalIdentifiers.addTypedAction,
   ]
 
+  static let appActionIDs = [FantasticalIdentifiers.miniWindowAction]
+
   static func actions() -> [CatalogAction] {
     var items: [CatalogAction] = []
 
@@ -43,6 +45,20 @@ extension FantasticalActionsCatalog {
     show.supportedSubjectTypes = [.fantasticalDestination, .fantasticalItem]
     show.subjectPredicate = { $0 is FantasticalDestinationItem || $0 is FantasticalAgendaEntity }
     items.append(show)
+
+    let openMini = PredicateAwareAction(
+      id: FantasticalIdentifiers.miniWindowAction, title: "Open Mini Window"
+    ) { subject, _ in
+      guard FantasticalActions.isFantasticalApplication(subject) else {
+        return .failure("Select Fantastical first")
+      }
+      return FantasticalActions.open(
+        url: FantasticalURLBuilder.showURL(for: .miniWindow), failure: "Invalid Fantastical URL")
+    }
+    openMini.systemSymbolName = "menubar.rectangle"
+    openMini.supportedSubjectTypes = [.application]
+    openMini.subjectPredicate = { FantasticalActions.isFantasticalApplication($0) }
+    items.append(openMini)
 
     items.append(
       makeAddAction(
@@ -93,7 +109,6 @@ extension FantasticalActionsCatalog {
     return items
   }
 
-  /// Typed text with inline fields, or a link item, becomes a Fantastical event or task.
   private static func makeAddAction(
     id: String, title: String, symbolName: String, task: Bool
   ) -> PredicateAwareAction {
@@ -160,8 +175,12 @@ enum FantasticalActions {
     } catch {
       return .failure("Nothing to add")
     }
-    return open(
+    let result = open(
       url: url(fields), failure: "Nothing to add", activates: !FantasticalSettings.addImmediately)
+    if case .success = result {
+      Task { @MainActor in FantasticalCreateWatcher.shared.creationStarted() }
+    }
+    return result
   }
 
   static func fields(for item: CatalogItem?) throws -> FantasticalFields {
@@ -191,7 +210,11 @@ enum FantasticalActions {
     }
     let configuration = NSWorkspace.OpenConfiguration()
     configuration.activates = activates
-    NSWorkspace.shared.open(url, configuration: configuration, completionHandler: nil)
+    NSWorkspace.shared.open(url, configuration: configuration) { _, error in
+      if let error {
+        FantasticalMCPClient.log.error("open failed: \(error.localizedDescription, privacy: .private)")
+      }
+    }
     return .success
   }
 

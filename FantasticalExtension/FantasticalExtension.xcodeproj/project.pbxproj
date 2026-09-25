@@ -14,12 +14,23 @@
 		FE000000000000000000B105 /* FantasticalActionsCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A105 /* FantasticalActionsCatalog.swift */; };
 		FE000000000000000000B10B /* FantasticalFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10B /* FantasticalFields.swift */; };
 		FE000000000000000000B10C /* FantasticalMCPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10C /* FantasticalMCPClient.swift */; };
+		FE000000000000000000B112 /* FantasticalMCPTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A112 /* FantasticalMCPTypes.swift */; };
+		FE000000000000000000B113 /* FantasticalCreateWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A113 /* FantasticalCreateWatcher.swift */; };
+		FE000000000000000000B114 /* FantasticalAgendaParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A114 /* FantasticalAgendaParser.swift */; };
+		FE000000000000000000B115 /* FantasticalAgendaSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A115 /* FantasticalAgendaSupport.swift */; };
 		FE000000000000000000B10D /* FantasticalAgendaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10D /* FantasticalAgendaModels.swift */; };
 		FE000000000000000000B10E /* FantasticalAgendaItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10E /* FantasticalAgendaItems.swift */; };
 		FE000000000000000000B10F /* FantasticalAgendaCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10F /* FantasticalAgendaCatalog.swift */; };
 		FE000000000000000000B110 /* FantasticalAgendaActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A110 /* FantasticalAgendaActions.swift */; };
 		FE000000000000000000B111 /* FantasticalAgendaSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A111 /* FantasticalAgendaSections.swift */; };
+		FE000000000000000000B117 /* FantasticalStoreReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A117 /* FantasticalStoreReader.swift */; };
+		FE000000000000000000B116 /* FantasticalReminderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A116 /* FantasticalReminderStore.swift */; };
+		FE000000000000000000B119 /* FantasticalAgendaTasks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A119 /* FantasticalAgendaTasks.swift */; };
 		FE000000000000000000B106 /* FantasticalExtensionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A106 /* FantasticalExtensionTests.swift */; };
+		FE000000000000000000B118 /* FantasticalTaskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A118 /* FantasticalTaskTests.swift */; };
+		FE000000000000000000B120 /* FantasticalTaskGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A120 /* FantasticalTaskGroupTests.swift */; };
+		FE000000000000000000B121 /* FantasticalShowAllTasksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A121 /* FantasticalShowAllTasksTests.swift */; };
+		FE000000000000000000B122 /* FantasticalMCPReconnectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A122 /* FantasticalMCPReconnectTests.swift */; };
 		FE000000000000000000B108 /* TunaFantastical.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A108 /* TunaFantastical.framework */; };
 		FE000000000000000000B10A /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FE000000000000000000A10A /* Cocoa.framework */; };
 /* End PBXBuildFile section */
@@ -42,12 +53,23 @@
 		FE000000000000000000A105 /* FantasticalActionsCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalActionsCatalog.swift; sourceTree = "<group>"; };
 		FE000000000000000000A10B /* FantasticalFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalFields.swift; sourceTree = "<group>"; };
 		FE000000000000000000A10C /* FantasticalMCPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalMCPClient.swift; sourceTree = "<group>"; };
+		FE000000000000000000A112 /* FantasticalMCPTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalMCPTypes.swift; sourceTree = "<group>"; };
+		FE000000000000000000A113 /* FantasticalCreateWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalCreateWatcher.swift; sourceTree = "<group>"; };
+		FE000000000000000000A114 /* FantasticalAgendaParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaParser.swift; sourceTree = "<group>"; };
+		FE000000000000000000A115 /* FantasticalAgendaSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaSupport.swift; sourceTree = "<group>"; };
 		FE000000000000000000A10D /* FantasticalAgendaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaModels.swift; sourceTree = "<group>"; };
 		FE000000000000000000A10E /* FantasticalAgendaItems.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaItems.swift; sourceTree = "<group>"; };
 		FE000000000000000000A10F /* FantasticalAgendaCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaCatalog.swift; sourceTree = "<group>"; };
 		FE000000000000000000A110 /* FantasticalAgendaActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaActions.swift; sourceTree = "<group>"; };
 		FE000000000000000000A111 /* FantasticalAgendaSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaSections.swift; sourceTree = "<group>"; };
+		FE000000000000000000A117 /* FantasticalStoreReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalStoreReader.swift; sourceTree = "<group>"; };
+		FE000000000000000000A116 /* FantasticalReminderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalReminderStore.swift; sourceTree = "<group>"; };
+		FE000000000000000000A119 /* FantasticalAgendaTasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasticalAgendaTasks.swift; sourceTree = "<group>"; };
 		FE000000000000000000A106 /* FantasticalExtensionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FantasticalExtensionTests.swift; sourceTree = "<group>"; };
+		FE000000000000000000A118 /* FantasticalTaskTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FantasticalTaskTests.swift; sourceTree = "<group>"; };
+		FE000000000000000000A120 /* FantasticalTaskGroupTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FantasticalTaskGroupTests.swift; sourceTree = "<group>"; };
+		FE000000000000000000A121 /* FantasticalShowAllTasksTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FantasticalShowAllTasksTests.swift; sourceTree = "<group>"; };
+		FE000000000000000000A122 /* FantasticalMCPReconnectTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FantasticalMCPReconnectTests.swift; sourceTree = "<group>"; };
 		FE000000000000000000A107 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		FE000000000000000000A108 /* TunaFantastical.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TunaFantastical.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE000000000000000000A109 /* FantasticalExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FantasticalExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -93,13 +115,24 @@
 				FE000000000000000000A105 /* FantasticalActionsCatalog.swift */,
 				FE000000000000000000A10B /* FantasticalFields.swift */,
 				FE000000000000000000A10C /* FantasticalMCPClient.swift */,
+				FE000000000000000000A112 /* FantasticalMCPTypes.swift */,
+				FE000000000000000000A113 /* FantasticalCreateWatcher.swift */,
+				FE000000000000000000A114 /* FantasticalAgendaParser.swift */,
+				FE000000000000000000A115 /* FantasticalAgendaSupport.swift */,
 				FE000000000000000000A10D /* FantasticalAgendaModels.swift */,
 				FE000000000000000000A10E /* FantasticalAgendaItems.swift */,
 				FE000000000000000000A10F /* FantasticalAgendaCatalog.swift */,
 				FE000000000000000000A110 /* FantasticalAgendaActions.swift */,
 				FE000000000000000000A111 /* FantasticalAgendaSections.swift */,
+				FE000000000000000000A117 /* FantasticalStoreReader.swift */,
+				FE000000000000000000A116 /* FantasticalReminderStore.swift */,
+				FE000000000000000000A119 /* FantasticalAgendaTasks.swift */,
 				FE000000000000000000A107 /* Info.plist */,
 				FE000000000000000000A106 /* FantasticalExtensionTests.swift */,
+				FE000000000000000000A118 /* FantasticalTaskTests.swift */,
+				FE000000000000000000A120 /* FantasticalTaskGroupTests.swift */,
+				FE000000000000000000A121 /* FantasticalShowAllTasksTests.swift */,
+				FE000000000000000000A122 /* FantasticalMCPReconnectTests.swift */,
 			);
 			path = .;
 			sourceTree = "<group>";
@@ -237,11 +270,18 @@
 				FE000000000000000000B105 /* FantasticalActionsCatalog.swift in Sources */,
 				FE000000000000000000B10B /* FantasticalFields.swift in Sources */,
 				FE000000000000000000B10C /* FantasticalMCPClient.swift in Sources */,
+				FE000000000000000000B112 /* FantasticalMCPTypes.swift in Sources */,
+				FE000000000000000000B113 /* FantasticalCreateWatcher.swift in Sources */,
+				FE000000000000000000B114 /* FantasticalAgendaParser.swift in Sources */,
+				FE000000000000000000B115 /* FantasticalAgendaSupport.swift in Sources */,
 				FE000000000000000000B10D /* FantasticalAgendaModels.swift in Sources */,
 				FE000000000000000000B10E /* FantasticalAgendaItems.swift in Sources */,
 				FE000000000000000000B10F /* FantasticalAgendaCatalog.swift in Sources */,
 				FE000000000000000000B110 /* FantasticalAgendaActions.swift in Sources */,
 				FE000000000000000000B111 /* FantasticalAgendaSections.swift in Sources */,
+				FE000000000000000000B117 /* FantasticalStoreReader.swift in Sources */,
+				FE000000000000000000B116 /* FantasticalReminderStore.swift in Sources */,
+				FE000000000000000000B119 /* FantasticalAgendaTasks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,6 +290,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				FE000000000000000000B106 /* FantasticalExtensionTests.swift in Sources */,
+				FE000000000000000000B118 /* FantasticalTaskTests.swift in Sources */,
+				FE000000000000000000B120 /* FantasticalTaskGroupTests.swift in Sources */,
+				FE000000000000000000B121 /* FantasticalShowAllTasksTests.swift in Sources */,
+				FE000000000000000000B122 /* FantasticalMCPReconnectTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

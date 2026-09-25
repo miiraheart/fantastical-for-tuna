@@ -1,8 +1,8 @@
 # Fantastical
 
 Fantastical brings your agenda into Tuna and turns typed text into events and tasks through
-Fantastical's natural language parser. Reads use Fantastical's built-in MCP helper, writes use its
-URL scheme; nothing leaves this Mac.
+Fantastical's natural language parser. Reads use Fantastical's built-in MCP helper, your Reminders
+lists and Fantastical's own database, creates use its URL scheme; nothing leaves this Mac.
 
 ## Adding events and tasks
 
@@ -71,29 +71,60 @@ its preview is open; only notes and the URL travel as parameters.
 
 ## Agenda
 
-Search for **Fantastical** and press → (or select Fantastical.app and press →) to browse **Today**,
-**Tomorrow**, **This Week**, **Next 7 Days**, **This Month**, **This Quarter**, **This Year**,
-**Tasks**, and **By Calendar**, each with its count. Type inside the root to search every event and
-task by name. Each item shows its day, time, calendar, and location. Fantastical answers at most 99
-items per query; a group at that limit says so.
+Search for **Fantastical** and press → to browse **Today**, **Tomorrow**, **This Week**,
+**This Month**, **This Quarter**, **Tasks**, **This Year**, **By Calendar** and **Next 7 Days**,
+each with its count. Selecting Fantastical.app and pressing → reaches the same groups, one level
+further in. Type inside the root to search events and tasks by name; search shows the first 60
+matches. Each item shows its day, time, calendar, and location.
+
+- **Tasks** shows your open tasks the way Fantastical does: an **Overdue** group first, then one
+  group per task list, each row saying the due date, the list and the priority, undated tasks
+  after the dated ones. An overdue task is in both places: the Overdue group and its own list.
+  Finished tasks are left out. Reminders lists are read through the system Reminders permission,
+  which Tuna asks for once; lists Fantastical syncs itself (Google Tasks, Todoist, CalDAV tasks)
+  are read from Fantastical's local database. When neither is available a list falls back to
+  Fantastical's helper, which only reports dated tasks, those overdue or due in the next 30 days,
+  and no completion state, and its row says `completion unknown`.
+  Press Return on **Tasks** to see every open task in one list, due soonest first; press the
+  right arrow to browse the Overdue group and the lists.
+- **Today** and **Tomorrow** split at midnight, and an item that runs across midnight or over
+  several days is listed under every day it covers.
+- **By Calendar** groups the next 7 days by calendar, read-only calendars included. Writability
+  only decides where a new item can be created, and which items can be edited or deleted.
+- All-day items keep the day Fantastical gives them, even when this Mac is in another timezone.
+- Fantastical answers at most 99 items per query, and a group at that limit says so. Today,
+  Tomorrow and By Calendar are drawn from those answers, so a very busy period can leave them
+  short without a warning of their own.
 
 Actions on an item:
 
 - **Show in Fantastical** (default): reveals the item's day.
 - **Reschedule...**, **Rename...**, **Change Location...**: type the new value as the target.
-  Reschedule takes words such as `tomorrow 15h` or `next monday 9h to 10h`.
+  Reschedule takes words such as `tomorrow 15h` or `next monday 9h to 10h`. Change Location is
+  offered on events only, since Fantastical keeps no location on a task.
+- **Complete Task**: finishes a task read from Reminders and keeps Tuna open for the next one.
+  Offered on Reminders tasks in a writable list only.
 - **Delete from Fantastical**: asks for confirmation first.
+
+Reschedule, Rename, Change Location and Delete are offered only on items in calendars Fantastical
+can write to. An item in a read-only calendar keeps Show in Fantastical and nothing else.
 
 The agenda comes from Fantastical's built-in MCP helper (Fantastical 4.1.17 or later). The first
 time Tuna uses it, Fantastical asks whether to allow Tuna; refuse and the agenda shows a message
-instead. The helper does not expose notes, links, or a done flag, so those are not shown and tasks
-cannot be completed from Tuna.
+instead. The helper does not expose notes, links or a done flag, so open tasks come from EventKit
+(Reminders lists) and from Fantastical's local database instead, and Complete Task is offered on
+Reminders tasks only. Refuse the Reminders permission and the Tasks group shows a **Reminders
+access needed** row at the top; a Reminders list then falls back to Fantastical's helper, which
+only reports dated tasks and no completion state, until you allow Tuna under System Settings,
+Privacy & Security, Reminders.
 
 ## Views
 
 The **Fantastical Views** source lists Today, Tomorrow, Calendar (main window), Mini Window, one
 `Set: Name` entry per calendar set you add in settings, plus the New Event and New Task entries.
 Select a view to open it; its Fantastical URL is the copy and text value.
+
+Selecting **Fantastical.app** itself adds **Open Mini Window** to its actions.
 
 ## Settings
 
@@ -109,17 +140,30 @@ Tuna Settings > Extensions > Fantastical:
 
 ## Privacy and permissions
 
-Everything stays on this Mac: the URL scheme for creating items and views, and Fantastical's own
-MCP helper (`Fantastical.app/Contents/Helpers/FantasticalMCP.app`) over standard input and output
-for the agenda. No network access from the extension, no credentials, no EventKit. Agenda results
-live in memory only while the browse or search is open. Writes: reschedule, rename, change
-location, and delete (confirmed) through the helper; every create goes through the URL scheme.
+Everything stays on this Mac: the URL scheme for creating items and views, Fantastical's own MCP
+helper (`Fantastical.app/Contents/Helpers/FantasticalMCP.app`) over standard input and output for
+the agenda, and EventKit for your Reminders lists and Fantastical's own database, read only, for
+open tasks. No network access from the extension, no credentials. Agenda results live in memory
+only while the browse or search is open. Writes: reschedule, rename, change location, and delete
+(confirmed) through the helper, Complete Task through EventKit; every create goes through the URL
+scheme. Helper diagnostics are logged privately, so event and calendar text never reaches the
+public log. Reminders are read with the system permission Tuna already declares; nothing from
+EventKit or from Fantastical's database is logged.
 
 ## Limitations
 
-- Agenda reads go through Fantastical's helper because Tuna's host app declares no calendar usage
-  description, so EventKit is unavailable to extensions. The helper needs a date range in plain
-  words, so Tuna asks one range per group; items without a date only appear in search.
+- Event reads go through Fantastical's helper because Tuna's host app declares no calendar usage
+  description, so EventKit's calendars are unavailable to extensions; Reminders, whose permission
+  Tuna does declare, are read directly. The helper needs a date range in plain words, so Tuna asks
+  one range per group; an event without a date only appears in search.
+- Open tasks in lists Fantastical syncs itself are read from
+  `~/Library/Group Containers/85C27NK92C.com.flexibits.fantastical2.mac/Database/Fantastical-8.fcdata`,
+  read only, never written. That file is Fantastical's own and its layout may change with a
+  Fantastical update; when it cannot be read the list falls back to the helper.
+- A Reminders list is recognised by the source name Fantastical's helper reports for it,
+  `Calendar`. A Reminders list reported under another name is read from Fantastical's database
+  and, when that database does not hold it, from the helper. The extension log names the source
+  chosen for every list.
 - Verified against Fantastical 4.2 (`com.flexibits.fantastical2.mac`, direct download). The Mini
   Window scheme is registered by Fantastical's helper login item, which is enabled by default.
 

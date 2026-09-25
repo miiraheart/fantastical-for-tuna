@@ -2,8 +2,6 @@ import AppKit
 import Foundation
 import TunaKit
 
-/// The browse groups under the Fantastical root. Each one is a date window the helper
-/// understands; Tasks narrows to task calendars.
 enum FantasticalAgendaRange: CaseIterable, Sendable {
   case today, tomorrow, thisWeek, next7Days, thisMonth, thisQuarter, thisYear, tasks
 
@@ -45,11 +43,23 @@ enum FantasticalAgendaRange: CaseIterable, Sendable {
 
   var tasksOnly: Bool { self == .tasks }
 
-  /// Groups that need their own query. Today and Tomorrow are sliced from Next 7 Days.
-  static let queried: [FantasticalAgendaRange] = [.next7Days, .thisWeek, .thisMonth, .thisQuarter, .thisYear, .tasks]
+  static let taskWindowDays = 30
+  static let overdueYears = 5
 
-  /// Display order in the root: Today, Tomorrow, week, month, quarter, Tasks, year; By Calendar
-  /// and Next 7 Days follow.
+  var windowDescription: String? { nil }
+
+  /// The window a task list is asked for when the helper wants a date: years of backlog through
+  /// the days ahead, inclusive as the helper spells it.
+  static func taskWhen(now: Date, calendar: Calendar = .autoupdatingCurrent) -> String {
+    let day = calendar.startOfDay(for: now)
+    let start = calendar.date(byAdding: .year, value: -overdueYears, to: day) ?? day
+    let last = calendar.date(byAdding: .day, value: taskWindowDays - 1, to: day) ?? day
+    return FantasticalWhen.range(from: start, to: last, calendar: calendar)
+  }
+
+  /// Groups that need their own query. Today and Tomorrow are sliced from Next 7 Days.
+  static let queried: [FantasticalAgendaRange] = [.next7Days, .thisWeek, .thisMonth, .thisQuarter, .thisYear]
+
   var sortOrder: Int {
     switch self {
     case .today: return 0
@@ -76,7 +86,7 @@ enum FantasticalAgendaRange: CaseIterable, Sendable {
     case .thisMonth: return calendar.dateInterval(of: .month, for: now) ?? days(30, from: day)
     case .thisQuarter: return calendar.dateInterval(of: .quarter, for: now) ?? days(90, from: day)
     case .thisYear: return calendar.dateInterval(of: .year, for: now) ?? days(365, from: day)
-    case .tasks: return days(30, from: day)
+    case .tasks: return days(Self.taskWindowDays, from: day)
     }
   }
 
@@ -89,6 +99,10 @@ enum FantasticalAgendaRange: CaseIterable, Sendable {
     }
     return FantasticalWhen.range(from: interval.start, to: lastDay, calendar: calendar)
   }
+}
+
+protocol FantasticalScoredItem: AnyObject {
+  var sortScore: Double { get }
 }
 
 /// Sections keep their declared order and outrank items; items go soonest first. Tuna's time
@@ -110,6 +124,10 @@ enum FantasticalAgendaSort {
     return Date(timeIntervalSinceReferenceDate: 2 * mirrorPoint.timeIntervalSinceReferenceDate - start.timeIntervalSinceReferenceDate)
   }
 
+  /// Small enough never to reorder two different due dates (a second apart at least), large enough
+  /// to order same-day and undated tasks by priority.
+  static func priorityBonus(_ rank: Int) -> Double { Double(10 - max(1, min(rank, 10))) / 1_000 }
+
   static let options: [CatalogSortOption] = [
     CatalogSortOption(id: optionID, title: "Agenda", detail: "Groups in order, then soonest first", comparator: compare),
     .nameAscending,
@@ -117,8 +135,8 @@ enum FantasticalAgendaSort {
   ]
 
   static func compare(_ lhs: CatalogItem, _ rhs: CatalogItem) -> Bool {
-    let l = (lhs as? ScoredCatalogItem)?.sortScore ?? -1
-    let r = (rhs as? ScoredCatalogItem)?.sortScore ?? -1
+    let l = (lhs as? FantasticalScoredItem)?.sortScore ?? -1
+    let r = (rhs as? FantasticalScoredItem)?.sortScore ?? -1
     if l != r { return l > r }
     return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
   }

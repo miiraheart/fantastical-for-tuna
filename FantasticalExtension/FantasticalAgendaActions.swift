@@ -4,7 +4,8 @@ import TunaKit
 
 extension FantasticalActionsCatalog {
   static let agendaActionIDs = [
-    "reschedule", "rename", "change-location", "delete-item", "add-to-fantastical-calendar",
+    FantasticalIdentifiers.rescheduleAction, "rename", "change-location", FantasticalIdentifiers.completeAction,
+    "delete-item", "add-to-fantastical-calendar", FantasticalIdentifiers.showAllTasksAction,
   ]
 
   static func agendaActions() -> [CatalogAction] {
@@ -12,22 +13,40 @@ extension FantasticalActionsCatalog {
 
     items.append(
       makeModifyAction(
-        id: "reschedule", title: "Reschedule...", symbolName: "clock.arrow.circlepath",
+        id: FantasticalIdentifiers.rescheduleAction, title: "Reschedule...", symbolName: "clock.arrow.circlepath",
         field: "when", failure: "Type the new time, for example tomorrow 15h"))
     items.append(
       makeModifyAction(
         id: "rename", title: "Rename...", symbolName: "pencil", field: "title",
         failure: "Type the new title"))
-    items.append(
-      makeModifyAction(
-        id: "change-location", title: "Change Location...", symbolName: "mappin.and.ellipse",
-        field: "location", failure: "Type the new location"))
+    let changeLocation = makeModifyAction(
+      id: "change-location", title: "Change Location...", symbolName: "mappin.and.ellipse",
+      field: "location", failure: "Type the new location")
+    changeLocation.subjectPredicate = { subject in
+      guard let entity = subject as? FantasticalAgendaEntity else { return false }
+      return entity.isEditable && !entity.isTask
+    }
+    items.append(changeLocation)
+
+    let complete = PredicateAwareAction(id: FantasticalIdentifiers.completeAction, title: "Complete Task") {
+      subject, _ in
+      guard let entity = subject as? FantasticalAgendaEntity, entity.canComplete else {
+        return .failure("Only a Reminders task can be completed from Tuna")
+      }
+      return await FantasticalAgendaActions.complete(id: entity.item.id)
+    }
+    complete.systemSymbolName = "checkmark.circle"
+    complete.executionPolicy = .keepVisible
+    complete.supportedSubjectTypes = [.fantasticalItem]
+    complete.subjectPredicate = { ($0 as? FantasticalAgendaEntity)?.canComplete == true }
+    items.append(complete)
 
     let delete = PredicateAwareAction(id: "delete-item", title: "Delete from Fantastical") {
       subject, _ in
       guard let entity = subject as? FantasticalAgendaEntity else {
         return .failure("No Fantastical item selected")
       }
+      guard entity.isEditable else { return .failure(readOnlyFailure(entity)) }
       let itemID = entity.item.id
       return .review(
         ActionReviewSession(
@@ -49,7 +68,7 @@ extension FantasticalActionsCatalog {
     delete.systemSymbolName = "trash"
     delete.executionPolicy = .keepVisible
     delete.supportedSubjectTypes = [.fantasticalItem]
-    delete.subjectPredicate = { $0 is FantasticalAgendaEntity }
+    delete.subjectPredicate = { ($0 as? FantasticalAgendaEntity)?.isEditable == true }
     items.append(delete)
 
     let addToCalendar = PredicateAwareAction(
@@ -70,16 +89,40 @@ extension FantasticalActionsCatalog {
     addToCalendar.targetPredicate = { $0 is FantasticalCalendarEntity }
     items.append(addToCalendar)
 
+    let showAll = PredicateAwareAction(id: FantasticalIdentifiers.showAllTasksAction, title: "Show All Tasks") {
+      subject, _ in
+      guard let group = subject as? FantasticalTaskGroupItem else {
+        return .failure("Select the Tasks group first")
+      }
+      let rows = group.allTasks()
+      guard !rows.isEmpty else {
+        return .results([
+          FantasticalAgendaSupport.messageItem(
+            title: "No open tasks", message: "Nothing is open in your task lists.", symbolName: "checklist",
+            tint: .secondaryLabelColor)
+        ])
+      }
+      return .results(rows)
+    }
+    showAll.systemSymbolName = "checklist"
+    showAll.executionPolicy = .keepVisible
+    showAll.supportedSubjectTypes = [.fantasticalTaskGroup]
+    showAll.subjectPredicate = { $0 is FantasticalTaskGroupItem }
+    items.append(showAll)
+
     return items
   }
 
-  /// Subject is an agenda item, the typed text becomes one field of `modifyCalendarItem`.
   private static func makeModifyAction(
     id: String, title: String, symbolName: String, field: String, failure: String
   ) -> PredicateAwareAction {
     let action = PredicateAwareAction(id: id, title: title) { subject, target in
       guard let entity = subject as? FantasticalAgendaEntity else {
         return .failure("No Fantastical item selected")
+      }
+      guard entity.isEditable else { return .failure(readOnlyFailure(entity)) }
+      guard field != "location" || !entity.isTask else {
+        return .failure("Fantastical keeps no location on a task")
       }
       guard let value = FantasticalURLBuilder.textValue(for: target) else {
         return .failure(failure)
@@ -90,9 +133,16 @@ extension FantasticalActionsCatalog {
     action.systemSymbolName = symbolName
     action.supportedSubjectTypes = [.fantasticalItem]
     action.allowedTargetTypes = [.textSnippet]
-    action.subjectPredicate = { $0 is FantasticalAgendaEntity }
+    action.subjectPredicate = { ($0 as? FantasticalAgendaEntity)?.isEditable == true }
     action.targetPredicate = { FantasticalURLBuilder.textValue(for: $0) != nil }
     return action
+  }
+}
+
+extension FantasticalActionsCatalog {
+  static func readOnlyFailure(_ entity: FantasticalAgendaEntity) -> String {
+    let name = entity.calendarTitle.flatMap { $0.isEmpty ? nil : $0 } ?? "That calendar"
+    return "\(name) is read-only in Fantastical"
   }
 }
 
@@ -103,6 +153,17 @@ enum FantasticalAgendaActions {
 
   static func delete(id: String) async -> ActionResult {
     await perform("deleteCalendarItem", arguments: ["id": id])
+  }
+
+  /// The reminder store's own observer posts the change for this save, so posting it here too
+  /// rebuilt the agenda twice.
+  static func complete(id: String) async -> ActionResult {
+    do {
+      try await FantasticalReminderStore.shared.complete(id: id)
+    } catch {
+      return .failure(error.localizedDescription)
+    }
+    return .success
   }
 
   private static func perform(_ tool: String, arguments: [String: Any]) async -> ActionResult {

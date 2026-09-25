@@ -1,42 +1,7 @@
 import AppKit
 import Foundation
 import OSLog
-
-enum FantasticalMCPError: LocalizedError, Equatable {
-  case helperNotFound
-  case notRunning(detail: String?)
-  case timeout
-  case invalidResponse
-  case tool(String)
-
-  var title: String {
-    switch self {
-    case .helperNotFound: return "Fantastical 4.1.17 or later required"
-    case .notRunning: return "Fantastical is not responding"
-    case .timeout: return "Fantastical took too long"
-    case .invalidResponse: return "Unexpected reply from Fantastical"
-    case .tool: return "Fantastical could not complete that"
-    }
-  }
-
-  var errorDescription: String? {
-    switch self {
-    case .helperNotFound:
-      return "Install Fantastical in /Applications. Its built-in MCP helper provides the agenda."
-    case .notRunning(let detail):
-      guard let detail, !detail.isEmpty else { return "Open Fantastical and try again." }
-      return "Fantastical's helper stopped: \(detail)"
-    case .timeout: return "Fantastical did not answer within 60 seconds."
-    case .invalidResponse: return "The helper returned something Tuna could not read."
-    case .tool(let message): return message
-    }
-  }
-}
-
-struct FantasticalMCPResult: Sendable {
-  let text: String
-  let isError: Bool
-}
+import TunaKit
 
 /// Talks JSON-RPC over stdio to Fantastical's bundled MCP helper. One process lives for the
 /// session; Fantastical asks the user once to allow the host app.
@@ -46,29 +11,30 @@ actor FantasticalMCPClient {
 
   private var process: Process?
   private var input: FileHandle?
-  private var output: FileHandle?
-  private var errorOutput: FileHandle?
+  /// Kept until the helper they belong to has exited: a descriptor closed under a reader that is
+  /// still scheduled is the one thing `FileHandle` cannot recover from.
+  private var pipes: [Pipe] = []
+  private var retiringPipes: [Pipe] = []
+  private var readers: [Task<Void, Never>] = []
   private var startup: Task<Void, Error>?
   private var pending: [Int: CheckedContinuation<[String: Any], Error>] = [:]
   private var nextID = 1
   private var initialized = false
+  /// Bumped on every teardown, so a termination callback from a helper we already replaced
+  /// cannot clear the state of the one running now.
+  private var generation = 0
+  /// A helper on its way out. The helper serves one client at a time, so a replacement launched
+  /// while this one is still winding down would fight it for Fantastical's connection.
+  private var retiring: Process?
   private var lastStderrLine: String?
   private var chain: Task<Void, Never>?
   private let timeoutSeconds: UInt64 = 60
+  static let stderrDetailLimit = 200
+  static let toolMessageLimit = 400
+  private let locateHelper: @Sendable () -> URL?
 
-  static func helperURL() -> URL? {
-    guard
-      let app = NSWorkspace.shared.urlForApplication(
-        withBundleIdentifier: FantasticalIdentifiers.bundleIdentifier)
-    else { return nil }
-    let url = app.appending(path: "Contents/Helpers/FantasticalMCP.app/Contents/MacOS/FantasticalMCP")
-    return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
-  }
-
-  static func makeRequest(id: Int?, method: String, params: [String: Any]) -> [String: Any] {
-    var request: [String: Any] = ["jsonrpc": "2.0", "method": method, "params": params]
-    if let id { request["id"] = id }
-    return request
+  init(locateHelper: @escaping @Sendable () -> URL? = { FantasticalMCPClient.helperURL() }) {
+    self.locateHelper = locateHelper
   }
 
   /// The helper answers one request at a time; parallel calls make it drop its connection to
@@ -88,9 +54,12 @@ actor FantasticalMCPClient {
     }
   }
 
-  private func performCall(_ tool: String, arguments: [String: Any]) async throws -> FantasticalMCPResult {
+  private func performCall(
+    _ tool: String, arguments: [String: Any], isRetry: Bool = false
+  ) async throws -> FantasticalMCPResult {
     Self.log.info("call \(tool, privacy: .public)")
     try await ensureRunning()
+    let callGeneration = generation
     let response = try await request(
       method: "tools/call", params: ["name": tool, "arguments": arguments])
     guard let result = response["result"] as? [String: Any] else {
@@ -102,25 +71,36 @@ actor FantasticalMCPClient {
     let content = result["content"] as? [[String: Any]] ?? []
     let text = content.compactMap { $0["text"] as? String }.joined(separator: "\n")
     let isError = result["isError"] as? Bool ?? false
+    if isError, !isRetry, Self.isStrandedHelper(text) {
+      Self.log.error("helper lost Fantastical during \(tool, privacy: .public), restarting it")
+      if generation == callGeneration { shutdown() }
+      return try await performCall(tool, arguments: arguments, isRetry: true)
+    }
     if isError {
-      throw FantasticalMCPError.tool(text.isEmpty ? "Fantastical reported an error." : text)
+      throw FantasticalMCPError.tool(
+        text.isEmpty ? "Fantastical reported an error." : String(text.prefix(Self.toolMessageLimit)))
     }
     return FantasticalMCPResult(text: text, isError: false)
   }
 
+  /// A helper that outlives a Fantastical quit keeps answering, but only with this, until it is
+  /// replaced.
+  static func isStrandedHelper(_ text: String) -> Bool {
+    text.contains("Failed to connect to Fantastical")
+  }
+
   func shutdown() {
-    output?.readabilityHandler = nil
-    output = nil
-    errorOutput?.readabilityHandler = nil
-    errorOutput = nil
+    generation += 1
+    for reader in readers { reader.cancel() }
+    readers = []
     if let process {
       process.terminationHandler = nil
       try? input?.close()
       process.terminate()
-      DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-      }
+      retiring = process
+      retiringPipes = pipes
     }
+    pipes = []
     process = nil
     input = nil
     initialized = false
@@ -145,8 +125,13 @@ actor FantasticalMCPClient {
 
   private func start() async throws {
     shutdown()
+    if let retiring {
+      await Self.waitForExit(retiring)
+      self.retiring = nil
+      retiringPipes = []
+    }
     lastStderrLine = nil
-    guard let url = Self.helperURL() else { throw FantasticalMCPError.helperNotFound }
+    guard let url = locateHelper() else { throw FantasticalMCPError.helperNotFound }
 
     let process = Process()
     process.executableURL = url
@@ -156,21 +141,24 @@ actor FantasticalMCPClient {
     process.standardInput = stdin
     process.standardOutput = stdout
     process.standardError = stderr
+    let generation = self.generation
     process.terminationHandler = { [weak self] _ in
-      Task { await self?.handleTermination() }
+      Task { await self?.handleTermination(generation: generation) }
     }
     try process.run()
+    Self.suppressSIGPIPE(on: stdin.fileHandleForWriting)
     Self.log.info("helper started pid \(process.processIdentifier, privacy: .public)")
     self.process = process
     self.input = stdin.fileHandleForWriting
-    output = stdout.fileHandleForReading
-    errorOutput = stderr.fileHandleForReading
-    Self.readLines(from: stdout.fileHandleForReading) { [weak self] line in
-      Task { await self?.deliver(line: line) }
-    }
-    Self.readLines(from: stderr.fileHandleForReading) { [weak self] line in
-      Task { await self?.remember(stderrLine: line) }
-    }
+    pipes = [stdin, stdout, stderr]
+    readers = [
+      Task { [weak self] in
+        for await line in Self.lines(from: stdout.fileHandleForReading) { await self?.deliver(line: line) }
+      },
+      Task { [weak self] in
+        for await line in Self.lines(from: stderr.fileHandleForReading) { await self?.remember(stderrLine: line) }
+      },
+    ]
 
     _ = try await request(
       method: "initialize",
@@ -183,8 +171,42 @@ actor FantasticalMCPClient {
     initialized = true
   }
 
-  private func handleTermination() {
-    Self.log.error("helper exited: \(self.lastStderrLine ?? "no stderr", privacy: .public)")
+  /// A write into a pipe whose reader has died raises SIGPIPE and takes the host down with it;
+  /// with this flag on the descriptor the same write throws EPIPE and `send` reports it instead.
+  nonisolated private static func suppressSIGPIPE(on handle: FileHandle) {
+    _ = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
+  }
+
+  /// Bounded, because a helper that ignores SIGTERM must not wedge every later call: SIGKILL goes
+  /// out after two seconds and the wait gives up after three.
+  nonisolated private static func waitForExit(_ process: Process) async {
+    await withCheckedContinuation { continuation in
+      let resumed = LockedValue(false)
+      let finish = {
+        let first = resumed.withValue { done -> Bool in
+          defer { done = true }
+          return !done
+        }
+        if first { continuation.resume() }
+      }
+      DispatchQueue.global().async {
+        process.waitUntilExit()
+        finish()
+      }
+      DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+        if process.isRunning, process.processIdentifier > 0 { kill(process.processIdentifier, SIGKILL) }
+      }
+      DispatchQueue.global().asyncAfter(deadline: .now() + 3, execute: finish)
+    }
+  }
+
+  private func handleTermination(generation: Int) {
+    guard generation == self.generation else { return }
+    if let lastStderrLine {
+      Self.log.error("helper exited: \(lastStderrLine, privacy: .private)")
+    } else {
+      Self.log.error("helper exited with no stderr")
+    }
     process = nil
     input = nil
     initialized = false
@@ -194,9 +216,12 @@ actor FantasticalMCPClient {
   private func remember(stderrLine: String) {
     let trimmed = stderrLine.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    Self.log.info("helper stderr: \(trimmed, privacy: .public)")
-    lastStderrLine = trimmed.replacingOccurrences(
-      of: #"^\S+ \S+ \S+: \[FantasticalMCP\] "#, with: "", options: .regularExpression)
+    let stripped = String(
+      trimmed.replacingOccurrences(
+        of: #"^\S+ \S+ \S+: \[FantasticalMCP\] "#, with: "", options: .regularExpression
+      ).prefix(Self.stderrDetailLimit))
+    Self.log.info("helper stderr: \(stripped, privacy: .private)")
+    lastStderrLine = stripped
   }
 
   private func failAllPending(with error: Error) {
@@ -214,21 +239,24 @@ actor FantasticalMCPClient {
     nextID += 1
     let payload = Self.makeRequest(id: id, method: method, params: params)
     let deadline = Task { [timeoutSeconds] in
-      try await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
+      try await Task.sleep(for: .seconds(timeoutSeconds))
       await self.expire(id: id)
     }
     defer { deadline.cancel() }
     return try await withCheckedThrowingContinuation { continuation in
-      Task { await self.register(id: id, continuation: continuation, payload: payload) }
+      register(id: id, continuation: continuation, payload: payload)
     }
   }
 
   /// Frees a caller the helper never answered: `withCheckedThrowingContinuation` ignores
-  /// cancellation, so the continuation is resumed here instead of raced against a sleep.
+  /// cancellation, so the continuation is resumed here instead of raced against a sleep. The
+  /// helper answers one request at a time, so a request it never answered leaves the pipe out of
+  /// step; tearing it down here means the next call starts a fresh helper.
   private func expire(id: Int) {
     guard let continuation = pending.removeValue(forKey: id) else { return }
     Self.log.error("request \(id, privacy: .public) timed out")
     continuation.resume(throwing: FantasticalMCPError.timeout)
+    shutdown()
   }
 
   private func register(
@@ -251,19 +279,24 @@ actor FantasticalMCPClient {
     Self.log.info("sent \(payload["method"] as? String ?? "?", privacy: .public) id \(payload["id"] as? Int ?? -1, privacy: .public)")
   }
 
-  /// Splits the pipe into lines on Foundation's reader queue, never on the actor, so a
-  /// waiting read can never stall the request that would produce the reply.
-  nonisolated private static func readLines(from handle: FileHandle, _ onLine: @escaping @Sendable (String) -> Void) {
-    let buffer = LineBuffer()
-    handle.readabilityHandler = { handle in
-      let data = handle.availableData
-      guard !data.isEmpty else {
-        handle.readabilityHandler = nil
-        return
+  /// Splits the pipe into lines on Foundation's reader queue, never on the actor, and hands them
+  /// over in arrival order. The POSIX read is deliberate: `availableData` raises an uncatchable
+  /// exception once the descriptor is closed under it, and `read(upToCount:)` waits for the
+  /// whole count on a pipe, so a short reply never comes out.
+  nonisolated private static func lines(from handle: FileHandle) -> AsyncStream<String> {
+    AsyncStream { continuation in
+      let buffer = LineBuffer()
+      handle.readabilityHandler = { handle in
+        var chunk = [UInt8](repeating: 0, count: 65_536)
+        let count = chunk.withUnsafeMutableBytes { read(handle.fileDescriptor, $0.baseAddress, $0.count) }
+        guard count > 0 else {
+          handle.readabilityHandler = nil
+          continuation.finish()
+          return
+        }
+        for line in buffer.append(Data(chunk[0..<count])) { continuation.yield(line) }
       }
-      for line in buffer.append(data) {
-        onLine(line)
-      }
+      continuation.onTermination = { _ in handle.readabilityHandler = nil }
     }
   }
 
@@ -274,27 +307,7 @@ actor FantasticalMCPClient {
       let id = message["id"] as? Int,
       let continuation = pending.removeValue(forKey: id)
     else { return }
+    lastStderrLine = nil
     continuation.resume(returning: message)
-  }
-}
-
-/// Accumulates pipe chunks and hands back complete lines.
-final class LineBuffer: @unchecked Sendable {
-  private var pending = Data()
-  private let lock = NSLock()
-
-  func append(_ data: Data) -> [String] {
-    lock.lock()
-    defer { lock.unlock() }
-    pending.append(data)
-    var lines: [String] = []
-    while let newline = pending.firstIndex(of: 0x0A) {
-      let chunk = pending.subdata(in: pending.startIndex..<newline)
-      pending.removeSubrange(pending.startIndex...newline)
-      if let line = String(data: chunk, encoding: .utf8) {
-        lines.append(line)
-      }
-    }
-    return lines
   }
 }
